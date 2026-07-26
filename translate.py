@@ -5,7 +5,13 @@ from typing import Any, TypedDict, TYPE_CHECKING
 
 from exceptions import MinerException
 from utils import json_load, json_save
-from constants import IS_PACKAGED, LANG_PATH, DEFAULT_LANG
+from constants import (
+    DEFAULT_LANG,
+    IS_PACKAGED,
+    LANG_PATH,
+    RESOURCE_DIR,
+    WORKING_DIR,
+)
 
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
@@ -455,7 +461,7 @@ class Translator:
         # start with (and always copy) the default translation
         self._translation: Translation = default_translation.copy()
         # if we're in dev, update the template English.json file
-        if not IS_PACKAGED:
+        if not IS_PACKAGED and WORKING_DIR == RESOURCE_DIR:
             default_langpath = LANG_PATH.joinpath(f"{DEFAULT_LANG}.json")
             json_save(default_langpath, default_translation)
         self._translation["language_name"] = DEFAULT_LANG

@@ -16,7 +16,6 @@ import aiohttp
 from yarl import URL
 
 from translate import _
-from gui import GUIManager
 from channel import Channel
 from websocket import WebsocketPool
 from inventory import DropsCampaign
@@ -431,7 +430,12 @@ class _AuthState:
 
 
 class Twitch:
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        gui_factory: abc.Callable[[Twitch], Any] | None = None,
+    ):
         self.settings: Settings = settings
         # State management
         self._state: State = State.IDLE
@@ -449,7 +453,11 @@ class Twitch:
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
         # GUI
-        self.gui = GUIManager(self)
+        if gui_factory is None:
+            from gui import GUIManager
+
+            gui_factory = GUIManager
+        self.gui = gui_factory(self)
         # Storing and watching channels
         self.channels: OrderedDict[int, Channel] = OrderedDict()
         self.watching_channel: AwaitableValue[Channel] = AwaitableValue()
@@ -498,12 +506,28 @@ class Twitch:
     async def shutdown(self) -> None:
         start_time = time()
         self.stop_watching()
-        if self._watching_task is not None:
-            self._watching_task.cancel()
-            self._watching_task = None
-        if self._mnt_task is not None:
-            self._mnt_task.cancel()
-            self._mnt_task = None
+        background_tasks = [
+            task
+            for task in (self._watching_task, self._mnt_task)
+            if task is not None
+        ]
+        self._watching_task = None
+        self._mnt_task = None
+        for task in background_tasks:
+            task.cancel()
+        if background_tasks:
+            await asyncio.gather(*background_tasks, return_exceptions=True)
+
+        channel_tasks: list[asyncio.Task[Any]] = []
+        for channel in tuple(self.channels.values()):
+            if channel._pending_stream_up is not None:
+                channel_tasks.append(channel._pending_stream_up)
+            with suppress(KeyError):
+                channel.remove()
+        self.channels.clear()
+        if channel_tasks:
+            await asyncio.gather(*channel_tasks, return_exceptions=True)
+
         # stop websocket, close session and save cookies
         await self.websocket.stop(clear_topics=True)
         if self._session is not None:
@@ -518,7 +542,7 @@ class Twitch:
             await self._session.close()
             self._session = None
         self._drops.clear()
-        self.channels.clear()
+        self._campaigns.clear()
         self.inventory.clear()
         self._auth_state.clear()
         self.wanted_games.clear()
@@ -1487,6 +1511,7 @@ class Twitch:
         campaigns.sort(key=lambda c: c.eligible, reverse=True)
 
         self._drops.clear()
+        self._campaigns.clear()
         self.gui.inv.clear()
         self.inventory.clear()
         self._mnt_triggers.clear()

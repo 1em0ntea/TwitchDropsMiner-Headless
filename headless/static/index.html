@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="system">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#6f38d6">
+    <meta name="referrer" content="no-referrer">
+    <title>Twitch Drops Miner</title>
+    <link rel="stylesheet" href="/assets/app.css">
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content" data-i18n="common.skip">跳到主要内容</a>
+
+    <section id="loading-view" class="centered-view" aria-live="polite">
+      <div class="loading-mark" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <p data-i18n="common.loading">正在连接管理服务…</p>
+    </section>
+
+    <section id="login-view" class="centered-view login-view" hidden aria-labelledby="login-title">
+      <div class="login-toolbar">
+        <label class="sr-only" for="login-language" data-i18n="common.language">界面语言</label>
+        <select id="login-language" class="compact-select" aria-label="界面语言">
+          <option value="zh-CN">简体中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="login-card surface">
+        <div class="brand-lockup login-brand">
+          <span class="brand-mark" aria-hidden="true">⛏</span>
+          <span>
+            <strong>Twitch Drops Miner</strong>
+            <small data-i18n="login.subtitle">VPS 管理控制台</small>
+          </span>
+        </div>
+        <div class="login-copy">
+          <p class="eyebrow" data-i18n="login.eyebrow">安全访问</p>
+          <h1 id="login-title" data-i18n="login.title">登录管理界面</h1>
+          <p class="muted" data-i18n="login.note">
+            这里使用的是管理界面账号，不是 Twitch 账号。Twitch 将在登录后通过设备码连接。
+          </p>
+        </div>
+        <form id="login-form" class="stack" novalidate>
+          <label class="field">
+            <span data-i18n="login.username">用户名</span>
+            <input id="login-username" name="username" autocomplete="username" required maxlength="128">
+          </label>
+          <label class="field">
+            <span data-i18n="login.password">密码</span>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="512">
+          </label>
+          <p id="login-error" class="form-error" role="alert" hidden></p>
+          <button id="login-submit" class="button button-primary button-wide" type="submit">
+            <span data-i18n="login.submit">登录</span>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <div id="app-shell" class="app-shell" hidden>
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">⛏</span>
+          <span>
+            <strong>Twitch Drops Miner</strong>
+            <small data-i18n="brand.console">Headless Console</small>
+          </span>
+        </div>
+
+        <nav class="primary-nav" aria-label="主导航">
+          <button class="nav-item" type="button" data-view="overview" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"></path>
+            </svg>
+            <span data-i18n="nav.overview">总览</span>
+          </button>
+          <button class="nav-item" type="button" data-view="campaigns">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 12v8H4v-8h16Zm-9-8v6H4V4h7Zm9 0v6h-6V4h6Z"></path>
+            </svg>
+            <span data-i18n="nav.campaigns">活动</span>
+          </button>
+          <button class="nav-item" type="button" data-view="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m19.14 12.94.04-.94-.04-.94 2.03-1.58-1.92-3.32-2.39.96a7.2 7.2 0 0 0-1.63-.94L14.87 3h-3.74l-.36 3.18c-.58.24-1.12.55-1.63.94l-2.39-.96-1.92 3.32 2.03 1.58-.04.94.04.94-2.03 1.58 1.92 3.32 2.39-.96c.51.39 1.05.7 1.63.94l.36 3.18h3.74l.36-3.18a7.2 7.2 0 0 0 1.63-.94l2.39.96 1.92-3.32-2.03-1.58ZM13 15.5A3.5 3.5 0 1 1 13 8a3.5 3.5 0 0 1 0 7.5Z"></path>
+            </svg>
+            <span data-i18n="nav.settings">设置</span>
+          </button>
+          <button class="nav-item" type="button" data-view="system">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 4h14v3H5V4Zm0 6h14v3H5v-3Zm0 6h14v3H5v-3Z"></path>
+            </svg>
+            <span data-i18n="nav.system">系统</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="connection-indicator">
+            <span id="sidebar-connection-dot" class="connection-dot is-connecting" aria-hidden="true"></span>
+            <span id="sidebar-connection-text" data-i18n="connection.connecting">正在连接</span>
+          </div>
+          <span id="sidebar-version" class="mono muted">v—</span>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="mobile-brand">
+            <span class="brand-mark brand-mark-small" aria-hidden="true">⛏</span>
+            <span>Twitch Drops Miner</span>
+          </div>
+          <div id="service-pill" class="service-pill" role="status" aria-live="polite">
+            <span id="service-pill-dot" class="status-dot" aria-hidden="true"></span>
+            <span id="service-pill-text" data-i18n="service.connecting">连接中</span>
+          </div>
+          <div class="topbar-actions">
+            <label class="sr-only" for="app-language" data-i18n="common.language">界面语言</label>
+            <select id="app-language" class="compact-select" aria-label="界面语言">
+              <option value="zh-CN">简体中文</option>
+              <option value="en">English</option>
+            </select>
+            <button id="theme-toggle" class="icon-button" type="button" data-i18n-aria="theme.system" aria-label="跟随系统主题" title="跟随系统主题">
+              <span id="theme-icon" aria-hidden="true">◐</span>
+            </button>
+            <button id="management-logout" class="button button-quiet topbar-logout" type="button" hidden>
+              <span data-i18n="common.logout">退出管理界面</span>
+            </button>
+          </div>
+        </header>
+
+        <main id="main-content" class="main-content" tabindex="-1">
+          <section id="view-overview" class="view-panel" data-view-panel="overview" aria-labelledby="overview-title">
+            <header class="page-heading">
+              <div>
+                <p class="eyebrow" data-i18n="overview.eyebrow">实时状态</p>
+                <h1 id="overview-title" data-i18n="overview.title">运行总览</h1>
+                <p id="overview-generated-at" class="page-description muted tabular">—</p>
+              </div>
+              <button id="overview-refresh" class="button button-secondary" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"></path>
+                </svg>
+                <span data-i18n="actions.refreshInventory">刷新库存</span>
+              </button>
+            </header>
+
+            <div id="service-error" class="alert alert-danger" role="alert" hidden>
+              <strong data-i18n="service.errorTitle">服务需要处理</strong>
+              <span id="service-error-text"></span>
+            </div>
+
+            <div class="metrics-grid">
+              <article class="metric-card surface">
+                <div class="metric-icon metric-icon-purple" aria-hidden="true">◆</div>
+                <div>
+                  <span class="metric-label" data-i18n="overview.service">矿工服务</span>
+                  <strong id="metric-service-status">—</strong>
+                  <small id="metric-uptime" class="tabular muted">—</small>
+                </div>
+              </article>
+              <article class="metric-card surface">
+                <div class="metric-icon metric-icon-green" aria-hidden="true">●</div>
+                <div>
+                  <span class="metric-label" data-i18n="overview.account">Twitch 账号</span>
+                  <strong id="metric-account-status">—</strong>
+                  <small id="metric-user-id" class="tabular muted">—</small>
+                </div>
+              </article>
+              <article class="metric-card surface">
+                <div class="metric-icon metric-icon-blue" aria-hidden="true">↗</div>
+                <div>
+                  <span class="metric-label" data-i18n="overview.connections">Twitch 连接</span>
+                  <strong id="metric-connection-count" class="tabular">0</strong>
+                  <small id="metric-connection-detail" class="muted">—</small>
+                </div>
+              </article>
+            </div>
+
+            <div class="overview-grid">
+              <article class="surface panel drop-panel" aria-labelledby="active-drop-title">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="overview.nowMining">正在获取</p>
+                    <h2 id="active-drop-title" data-i18n="overview.activeDrop">当前掉落</h2>
+                  </div>
+                  <span id="active-drop-state" class="badge badge-neutral">—</span>
+                </div>
+                <div id="active-drop-content" class="drop-content"></div>
+              </article>
+
+              <article class="surface panel account-panel" aria-labelledby="account-panel-title">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="overview.identity">身份</p>
+                    <h2 id="account-panel-title" data-i18n="overview.twitchConnection">Twitch 连接</h2>
+                  </div>
+                </div>
+                <div id="account-content"></div>
+              </article>
+            </div>
+
+            <section class="surface panel channels-panel" aria-labelledby="channels-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow" data-i18n="overview.availableStreams">可用直播</p>
+                  <h2 id="channels-title" data-i18n="overview.channels">频道</h2>
+                </div>
+                <span id="channels-count" class="count-badge tabular">0</span>
+              </div>
+              <div class="table-wrap channel-table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-i18n="channels.channel">频道</th>
+                      <th scope="col" data-i18n="channels.status">状态</th>
+                      <th scope="col" data-i18n="channels.game">游戏</th>
+                      <th scope="col" data-i18n="channels.drops">掉落</th>
+                      <th scope="col" class="align-right" data-i18n="channels.viewers">观众</th>
+                      <th scope="col" data-i18n="channels.source">来源</th>
+                      <th scope="col" class="align-right" data-i18n="common.action">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="channels-body"></tbody>
+                </table>
+              </div>
+              <div id="channel-cards" class="channel-cards"></div>
+              <div id="channels-empty" class="empty-state" hidden>
+                <span class="empty-icon" aria-hidden="true">◌</span>
+                <strong data-i18n="channels.emptyTitle">暂时没有频道</strong>
+                <p data-i18n="channels.emptyBody">矿工正在寻找符合当前掉落条件的直播。</p>
+              </div>
+            </section>
+          </section>
+
+          <section id="view-campaigns" class="view-panel" data-view-panel="campaigns" aria-labelledby="campaigns-title" hidden>
+            <header class="page-heading">
+              <div>
+                <p class="eyebrow" data-i18n="campaigns.eyebrow">Drops Inventory</p>
+                <h1 id="campaigns-title" data-i18n="campaigns.title">掉落活动</h1>
+                <p class="page-description muted" data-i18n="campaigns.description">查看当前、即将开始和已结束的掉落活动。</p>
+              </div>
+              <button id="campaigns-refresh" class="button button-secondary" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"></path>
+                </svg>
+                <span data-i18n="actions.refresh">刷新</span>
+              </button>
+            </header>
+
+            <section class="surface filter-panel" aria-labelledby="campaign-filter-title">
+              <div class="filter-search">
+                <label for="campaign-search" id="campaign-filter-title" data-i18n="campaigns.searchLabel">搜索活动或游戏</label>
+                <div class="search-input">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m20 18.6-4.35-4.35a6.5 6.5 0 1 0-1.4 1.4L18.6 20 20 18.6ZM5 10.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0Z"></path>
+                  </svg>
+                  <input id="campaign-search" type="search" data-i18n-placeholder="campaigns.searchPlaceholder" placeholder="输入活动或游戏名称">
+                </div>
+              </div>
+              <fieldset class="filter-options">
+                <legend data-i18n="campaigns.show">显示</legend>
+                <label class="filter-chip"><input id="filter-active" type="checkbox" checked><span data-i18n="campaigns.active">进行中</span></label>
+                <label class="filter-chip"><input id="filter-upcoming" type="checkbox" checked><span data-i18n="campaigns.upcoming">即将开始</span></label>
+                <label class="filter-chip"><input id="filter-expired" type="checkbox"><span data-i18n="campaigns.expired">已结束</span></label>
+                <label class="filter-chip"><input id="filter-unlinked" type="checkbox"><span data-i18n="campaigns.unlinked">未关联</span></label>
+                <label class="filter-chip"><input id="filter-excluded" type="checkbox"><span data-i18n="campaigns.excluded">已排除</span></label>
+                <label class="filter-chip"><input id="filter-finished" type="checkbox"><span data-i18n="campaigns.finished">已完成</span></label>
+              </fieldset>
+            </section>
+
+            <div class="result-bar">
+              <p id="campaign-result-count" class="muted tabular">—</p>
+            </div>
+            <div id="campaign-list" class="campaign-list"></div>
+            <div id="campaigns-empty" class="surface empty-state large-empty" hidden>
+              <span class="empty-icon" aria-hidden="true">◇</span>
+              <strong data-i18n="campaigns.emptyTitle">没有符合条件的活动</strong>
+              <p data-i18n="campaigns.emptyBody">调整筛选条件，或刷新 Twitch 库存。</p>
+            </div>
+          </section>
+
+          <section id="view-settings" class="view-panel" data-view-panel="settings" aria-labelledby="settings-title" hidden>
+            <header class="page-heading">
+              <div>
+                <p class="eyebrow" data-i18n="settings.eyebrow">挖矿偏好</p>
+                <h1 id="settings-title" data-i18n="settings.title">设置</h1>
+                <p class="page-description muted" data-i18n="settings.description">设置保存后会触发库存刷新，并重新计算目标游戏。</p>
+              </div>
+              <span id="settings-state" class="badge badge-neutral" data-i18n="settings.saved">已保存</span>
+            </header>
+
+            <form id="settings-form" class="settings-layout" novalidate>
+              <div class="settings-main">
+                <section class="surface panel" aria-labelledby="general-settings-title">
+                  <div class="panel-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="settings.generalEyebrow">常规</p>
+                      <h2 id="general-settings-title" data-i18n="settings.general">运行偏好</h2>
+                    </div>
+                  </div>
+                  <div class="form-grid">
+                    <label class="field">
+                      <span data-i18n="settings.minerLanguage">矿工语言</span>
+                      <select id="setting-language" name="language">
+                        <option value="English">English</option>
+                        <option value="简体中文">简体中文</option>
+                        <option value="繁體中文">繁體中文</option>
+                        <option value="Deutsch">Deutsch</option>
+                        <option value="Español">Español</option>
+                        <option value="Français">Français</option>
+                        <option value="Italiano">Italiano</option>
+                        <option value="日本語">日本語</option>
+                        <option value="Português">Português</option>
+                        <option value="Русский">Русский</option>
+                        <option value="Türkçe">Türkçe</option>
+                        <option value="Українська">Українська</option>
+                        <option value="العربية">العربية</option>
+                      </select>
+                      <small data-i18n="settings.languageHint">修改矿工语言后可能需要重启后端。</small>
+                    </label>
+                    <label class="field">
+                      <span data-i18n="settings.priorityMode">优先模式</span>
+                      <select id="setting-priority-mode" name="priority_mode">
+                        <option value="PRIORITY_ONLY" data-i18n="settings.priorityOnly">仅优先列表</option>
+                        <option value="ENDING_SOONEST" data-i18n="settings.endingSoonest">最早结束优先</option>
+                        <option value="LOW_AVBL_FIRST" data-i18n="settings.lowAvailability">低可用性优先</option>
+                      </select>
+                    </label>
+                    <label class="field field-span">
+                      <span data-i18n="settings.proxy">代理地址</span>
+                      <input id="setting-proxy" name="proxy" type="password" autocomplete="off" spellcheck="false" placeholder="http://user:password@host:port">
+                      <small id="proxy-hint" data-i18n="settings.proxyHint">留空表示不使用代理；已保存的密码不会回显。</small>
+                    </label>
+                    <label class="field field-span range-field">
+                      <span>
+                        <span data-i18n="settings.connectionQuality">连接质量倍率</span>
+                        <output id="connection-quality-output" class="range-output tabular" for="setting-connection-quality">1×</output>
+                      </span>
+                      <input id="setting-connection-quality" name="connection_quality" type="range" min="1" max="6" step="1" value="1">
+                      <small data-i18n="settings.connectionHint">网络较慢时提高；数值越高，请求超时等待越久。</small>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="surface panel" aria-labelledby="advanced-settings-title">
+                  <div class="panel-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="settings.advancedEyebrow">高级</p>
+                      <h2 id="advanced-settings-title" data-i18n="settings.advanced">额外检查</h2>
+                    </div>
+                  </div>
+                  <div class="toggle-list">
+                    <label class="toggle-row">
+                      <span>
+                        <strong data-i18n="settings.badgesEmotes">徽章与表情掉落</strong>
+                        <small data-i18n="settings.badgesEmotesHint">将徽章和表情奖励纳入活动筛选。</small>
+                      </span>
+                      <input id="setting-badges-emotes" type="checkbox" name="enable_badges_emotes">
+                    </label>
+                    <label class="toggle-row">
+                      <span>
+                        <strong data-i18n="settings.availableDropsCheck">可用掉落检查</strong>
+                        <small data-i18n="settings.availableDropsHint">额外验证直播是否实际启用掉落。</small>
+                      </span>
+                      <input id="setting-available-drops" type="checkbox" name="available_drops_check">
+                    </label>
+                    <label class="toggle-row">
+                      <span>
+                        <strong data-i18n="settings.notifications">掉落通知</strong>
+                        <small data-i18n="settings.notificationsHint">服务器领取奖励时向已授权的浏览器推送通知。</small>
+                      </span>
+                      <input id="setting-notifications" type="checkbox" name="tray_notifications">
+                    </label>
+                    <label class="toggle-row">
+                      <span>
+                        <strong data-i18n="settings.defaultDark">默认深色界面</strong>
+                        <small data-i18n="settings.defaultDarkHint">作为新浏览器首次访问时的默认主题。</small>
+                      </span>
+                      <input id="setting-dark-mode" type="checkbox" name="dark_mode">
+                    </label>
+                  </div>
+                </section>
+              </div>
+
+              <div class="settings-lists">
+                <section class="surface panel list-editor" aria-labelledby="priority-list-title">
+                  <div class="panel-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="settings.ordered">有序列表</p>
+                      <h2 id="priority-list-title" data-i18n="settings.priorityGames">优先游戏</h2>
+                    </div>
+                    <span id="priority-count" class="count-badge tabular">0</span>
+                  </div>
+                  <div class="inline-entry">
+                    <label class="sr-only" for="priority-input" data-i18n="settings.gameName">游戏名称</label>
+                    <input id="priority-input" list="games-list" data-i18n-placeholder="settings.addGame" placeholder="添加游戏">
+                    <button id="priority-add" class="button button-secondary" type="button">
+                      <span aria-hidden="true">＋</span>
+                      <span data-i18n="common.add">添加</span>
+                    </button>
+                  </div>
+                  <ol id="priority-list" class="editable-list"></ol>
+                  <p id="priority-empty" class="list-empty muted" data-i18n="settings.priorityEmpty">尚未添加优先游戏。</p>
+                </section>
+
+                <section class="surface panel list-editor" aria-labelledby="exclude-list-title">
+                  <div class="panel-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="settings.unordered">排除列表</p>
+                      <h2 id="exclude-list-title" data-i18n="settings.excludedGames">排除游戏</h2>
+                    </div>
+                    <span id="exclude-count" class="count-badge tabular">0</span>
+                  </div>
+                  <div class="inline-entry">
+                    <label class="sr-only" for="exclude-input" data-i18n="settings.gameName">游戏名称</label>
+                    <input id="exclude-input" list="games-list" data-i18n-placeholder="settings.addGame" placeholder="添加游戏">
+                    <button id="exclude-add" class="button button-secondary" type="button">
+                      <span aria-hidden="true">＋</span>
+                      <span data-i18n="common.add">添加</span>
+                    </button>
+                  </div>
+                  <ul id="exclude-list" class="editable-list"></ul>
+                  <p id="exclude-empty" class="list-empty muted" data-i18n="settings.excludeEmpty">尚未排除任何游戏。</p>
+                </section>
+              </div>
+
+              <div class="settings-savebar surface">
+                <div>
+                  <strong data-i18n="settings.saveTitle">保存设置</strong>
+                  <p id="settings-save-hint" class="muted" data-i18n="settings.saveHint">当前没有未保存的更改。</p>
+                </div>
+                <button id="settings-save" class="button button-primary" type="submit" disabled>
+                  <span data-i18n="common.save">保存更改</span>
+                </button>
+              </div>
+            </form>
+            <datalist id="games-list"></datalist>
+          </section>
+
+          <section id="view-system" class="view-panel" data-view-panel="system" aria-labelledby="system-title" hidden>
+            <header class="page-heading">
+              <div>
+                <p class="eyebrow" data-i18n="system.eyebrow">维护与诊断</p>
+                <h1 id="system-title" data-i18n="system.title">系统</h1>
+                <p class="page-description muted" data-i18n="system.description">查看运行信息、活动日志和账户级操作。</p>
+              </div>
+            </header>
+
+            <div class="system-grid">
+              <section class="surface panel" aria-labelledby="runtime-title">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="system.runtimeEyebrow">Runtime</p>
+                    <h2 id="runtime-title" data-i18n="system.runtime">运行信息</h2>
+                  </div>
+                </div>
+                <dl id="runtime-details" class="detail-list"></dl>
+              </section>
+              <section class="surface panel" aria-labelledby="connections-title">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="system.networkEyebrow">Network</p>
+                    <h2 id="connections-title" data-i18n="system.connections">Twitch WebSocket</h2>
+                  </div>
+                </div>
+                <div id="connections-list" class="connection-list"></div>
+              </section>
+            </div>
+
+            <section class="surface panel activity-panel" aria-labelledby="activity-title">
+              <div class="panel-heading activity-heading">
+                <div>
+                  <p class="eyebrow" data-i18n="system.activityEyebrow">Recent events</p>
+                  <h2 id="activity-title" data-i18n="system.activity">活动日志</h2>
+                </div>
+                <div class="activity-tools">
+                  <label class="sr-only" for="activity-search" data-i18n="system.searchLogs">搜索日志</label>
+                  <input id="activity-search" type="search" data-i18n-placeholder="system.searchLogs" placeholder="搜索日志">
+                  <button id="copy-activity" class="button button-quiet" type="button" data-i18n="system.copyLogs">复制日志</button>
+                </div>
+              </div>
+              <ol id="activity-list" class="activity-list" aria-live="polite"></ol>
+              <div id="activity-empty" class="empty-state" hidden>
+                <span class="empty-icon" aria-hidden="true">≡</span>
+                <strong data-i18n="system.noActivity">暂无活动日志</strong>
+              </div>
+            </section>
+
+            <section class="surface panel danger-panel" aria-labelledby="danger-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow eyebrow-danger" data-i18n="system.dangerEyebrow">需确认的操作</p>
+                  <h2 id="danger-title" data-i18n="system.danger">维护操作</h2>
+                </div>
+              </div>
+              <div class="danger-actions">
+                <div>
+                  <strong data-i18n="system.restartTitle">重启矿工后端</strong>
+                  <p class="muted" data-i18n="system.restartBody">短暂中断当前连接并重新初始化，Web 管理界面会自动重连。</p>
+                  <button id="restart-service" class="button button-secondary" type="button" data-i18n="actions.restart">重启后端</button>
+                </div>
+                <div>
+                  <strong data-i18n="system.disconnectTitle">断开 Twitch 账号</strong>
+                  <p class="muted" data-i18n="system.disconnectBody">撤销 Twitch 访问令牌并清除登录 Cookie，之后需要重新输入设备码。</p>
+                  <button id="disconnect-twitch" class="button button-danger" type="button" data-i18n="actions.disconnect">断开 Twitch</button>
+                </div>
+              </div>
+            </section>
+          </section>
+        </main>
+      </div>
+
+      <nav class="mobile-nav" aria-label="主导航">
+        <button class="mobile-nav-item" type="button" data-view="overview" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"></path></svg>
+          <span data-i18n="nav.overview">总览</span>
+        </button>
+        <button class="mobile-nav-item" type="button" data-view="campaigns">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8h16Zm-9-8v6H4V4h7Zm9 0v6h-6V4h6Z"></path></svg>
+          <span data-i18n="nav.campaigns">活动</span>
+        </button>
+        <button class="mobile-nav-item" type="button" data-view="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19.14 12.94.04-.94-.04-.94 2.03-1.58-1.92-3.32-2.39.96a7.2 7.2 0 0 0-1.63-.94L14.87 3h-3.74l-.36 3.18c-.58.24-1.12.55-1.63.94l-2.39-.96-1.92 3.32 2.03 1.58-.04.94.04.94-2.03 1.58 1.92 3.32 2.39-.96c.51.39 1.05.7 1.63.94l.36 3.18h3.74l.36-3.18a7.2 7.2 0 0 0 1.63-.94l2.39.96 1.92-3.32-2.03-1.58ZM13 15.5A3.5 3.5 0 1 1 13 8a3.5 3.5 0 0 1 0 7.5Z"></path></svg>
+          <span data-i18n="nav.settings">设置</span>
+        </button>
+        <button class="mobile-nav-item" type="button" data-view="system">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v3H5V4Zm0 6h14v3H5v-3Zm0 6h14v3H5v-3Z"></path></svg>
+          <span data-i18n="nav.system">系统</span>
+        </button>
+      </nav>
+    </div>
+
+    <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+      <form method="dialog" class="dialog-card">
+        <div id="confirm-icon" class="dialog-icon" aria-hidden="true">!</div>
+        <div class="dialog-copy">
+          <h2 id="confirm-title">确认操作</h2>
+          <p id="confirm-body" class="muted"></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="confirm-cancel" class="button button-secondary" value="cancel" type="submit" data-i18n="common.cancel">取消</button>
+          <button id="confirm-accept" class="button button-danger" value="confirm" type="submit">确认</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+  </body>
+</html>

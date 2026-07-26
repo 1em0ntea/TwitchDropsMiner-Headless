@@ -1,0 +1,22 @@
+[Unit]
+Description=Twitch Drops Miner Headless (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/twitchdropsminer
+ExecStartPre=/usr/bin/docker compose config --quiet
+ExecStart=/usr/bin/docker compose up --detach --wait --remove-orphans
+ExecReload=/usr/bin/docker compose pull
+ExecReload=/usr/bin/docker compose up --detach --wait --remove-orphans
+ExecStop=/usr/bin/docker compose stop --timeout 30
+TimeoutStartSec=180s
+TimeoutStopSec=45s
+
+[Install]
+WantedBy=multi-user.target

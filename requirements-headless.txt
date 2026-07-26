@@ -1,0 +1,3 @@
+aiohttp>=3.9,<4.0
+truststore
+yarl>=1.9,<2.0

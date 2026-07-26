@@ -1,11 +1,10 @@
-name: Build
+name: Legacy desktop build (manual)
 
 on:
-  push:
-    branches:
-      - "master"
-  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   PYTHON_VERSION: "3.10"

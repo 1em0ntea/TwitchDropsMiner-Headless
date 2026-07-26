@@ -26,3 +26,23 @@ settings.json
 /*.AppImage.zsync
 .DS_Store
 *.app
+
+# Headless development and test artifacts
+/.pytest_cache/
+/.ruff_cache/
+/.coverage
+/.coverage.*
+/coverage.xml
+/htmlcov/
+/work-test-data/
+/.local-data/
+
+# Headless runtime state and local deployment configuration
+/.env
+/.env.*
+/cookies.jar
+/deploy/secrets/web_password
+
+# Local virtual environments
+/.venv/
+/venv/

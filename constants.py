@@ -46,14 +46,12 @@ def _resource_path(relative_path: Path | str) -> Path:
 
     Works for dev and for PyInstaller.
     """
-    if IS_APPIMAGE:
-        base_path = Path(sys.argv[0]).resolve().parent
-    elif IS_PACKAGED:
+    if IS_PACKAGED and not IS_APPIMAGE:
         # PyInstaller's folder where the one-file app is unpacked
         meipass: str = getattr(sys, "_MEIPASS")
         base_path = Path(meipass)
     else:
-        base_path = WORKING_DIR
+        base_path = RESOURCE_DIR
     return base_path.joinpath(relative_path)
 
 
@@ -91,9 +89,20 @@ else:
     SELF_PATH = Path(sys.argv[0]).resolve()
     if SELF_PATH.stem == "pyinstaller" or SELF_PATH.name == "gui.py":
         SELF_PATH = Path(__file__).with_name("main.py").resolve()
-WORKING_DIR = SELF_PATH.parent
+RESOURCE_DIR = (
+    Path(sys.argv[0]).resolve().parent
+    if IS_APPIMAGE
+    else SELF_PATH.parent
+)
+_data_dir = os.environ.get("TDM_DATA_DIR", "").strip()
+WORKING_DIR = (
+    Path(_data_dir).expanduser().resolve()
+    if _data_dir
+    else RESOURCE_DIR
+)
+WORKING_DIR.mkdir(parents=True, exist_ok=True)
 # Development paths
-VENV_PATH = Path(WORKING_DIR, "env")
+VENV_PATH = Path(RESOURCE_DIR, "env")
 SITE_PACKAGES_PATH = Path(VENV_PATH, SYS_SITE_PACKAGES)
 SCRIPTS_PATH = Path(VENV_PATH, SYS_SCRIPTS)
 # Translations path

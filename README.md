@@ -1,181 +1,143 @@
-# Twitch Drops Miner
+# TwitchDropsMiner Headless
 
-This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle.
+[![Headless CI](https://github.com/1em0ntea/TwitchDropsMiner-Headless/actions/workflows/headless-ci.yml/badge.svg)](https://github.com/1em0ntea/TwitchDropsMiner-Headless/actions/workflows/headless-ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-### How It Works:
+一个面向 Linux VPS 长期运行的 Twitch Drops Miner：原生无桌面服务、真正的浏览器管理界面、Docker 与 systemd 部署支持。
 
-Every several seconds, the application pretends to watch a particular stream by fetching stream metadata - this is enough to advance the drops. Note that this completely bypasses the need to download any actual stream video and sound. To keep the status (ONLINE or OFFLINE) of the channels up-to-date, there's a websocket connection established that receives events about streams going up or down, or updates regarding the current amount of viewers.
+A lightweight, native headless Twitch Drops miner for long-running Linux VPS deployments, with a real browser-based management interface.
 
-### Features:
+> [!IMPORTANT]
+> 本项目是一个**全新的独立仓库**，基于
+> [DevilXD/TwitchDropsMiner](https://github.com/DevilXD/TwitchDropsMiner)
+> 的代码与历史开发；它不是旧 Fork 中的分支。Headless/VPS/Docker 相关问题请在本仓库反馈，不要向上游项目寻求支持。
 
-- Stream-less drop mining - save on bandwidth.
-- Game priority and exclusion lists, allowing you to focus on mining what you want, in the order you want, and ignore what you don't want.
-- Sharded websocket connection, allowing for tracking up to `199` channels at the same time.
-- Automatic drop campaigns discovery based on linked accounts (requires you to do [account linking](https://www.twitch.tv/drops/campaigns) yourself though).
-- Stream tags and drop campaign validation, to ensure you won't end up mining a stream that can't earn you the drop.
-- Automatic channel stream switching, when the one you were currently watching goes offline, as well as when a channel streaming a higher priority game goes online.
-- Login session is saved in a cookies file, so you don't need to login every time.
-- Mining is automatically started as new campaigns appear, and stopped when the last available drops have been mined.
+## 为什么是 Headless / Why headless
 
-### Usage:
+- **真正的 Web UI**：状态、活动、战役、频道与设置都直接在浏览器中管理。
+- **无桌面运行时**：生产入口不需要 X11、桌面会话、Tk 窗口、VNC 或 noVNC。
+- **轻量依赖**：Headless 环境只安装 `aiohttp`、`truststore` 与 `yarl`。
+- **实时更新**：REST API 负责命令与快照，Server-Sent Events（SSE）推送状态变化。
+- **适合守护运行**：支持健康检查、持久化数据目录、优雅退出、Docker 重启策略与 systemd。
+- **默认安全边界**：默认仅监听回环地址；Docker 端口也只发布到 VPS 的 `127.0.0.1`。
 
-- Download and unzip [the latest release](https://github.com/DevilXD/TwitchDropsMiner/releases) - it's recommended to keep it in the folder it comes in.
-- Run it and login/connect the miner to your Twitch account by using the in-app login form.
-- After a successful login, the app should fetch a list of all available campaigns and games you can mine drops for - you can then select and add games of choice to the Priority List available on the Settings tab, and then press on the `Reload` button to start processing. It will fetch a list of all applicable streams it can watch, and start mining right away. You can also manually switch to a different channel as needed.
-- If you wish to keep the miner occupied with mining anything it can, beyond what you've selected via the Priority List, you can use the Priority Mode setting to specify the mining order for the rest of the games.
-- Make sure to link your Twitch account to game accounts on the [campaigns page](https://www.twitch.tv/drops/campaigns), to enable more games to be mined.
+The browser UI talks to the miner core through a small `aiohttp` service. There is no remote desktop layer between them.
 
-### Pictures:
+```text
+Browser
+  ├─ REST /api/v1/*  ── commands and snapshots
+  └─ SSE  /api/v1/events ── live state updates
+                 │
+          Headless manager
+                 │
+       TwitchDropsMiner core
+```
 
-![Main](https://user-images.githubusercontent.com/4180725/164298155-c0880ad7-6423-4419-8d73-f3c053730a1b.png)
-![Inventory](https://user-images.githubusercontent.com/4180725/164298315-81cae0d2-24a4-4822-a056-154fd763c284.png)
-![Settings](https://user-images.githubusercontent.com/4180725/164298391-b13ad40d-3881-436c-8d4c-34e2bbe33a78.png)
+## Docker 快速开始 / Quick start
 
-### Notes:
+需要 Docker Engine 与 Docker Compose 插件。以下命令会生成独立的 Web 管理密码，并把容器端口限制在 VPS 本机：
 
-> [!WARNING]  
-> Due to how Twitch handles the drop progression on their side, watching a stream in the browser (or by any other means) on the same account that is actively being used by the miner, will usually cause the miner to misbehave, reporting false progress and getting stuck mining the current drop.  
-> 
-> Using the same account to watch other streams during mining is thus discouraged, in order to avoid any problems arising from it.
+```sh
+git clone https://github.com/1em0ntea/TwitchDropsMiner-Headless.git
+cd TwitchDropsMiner-Headless
+cp deploy/.env.example .env
+umask 077
+openssl rand -base64 32 > deploy/secrets/web_password
+docker compose build
+docker compose up -d --wait
+```
 
-> [!CAUTION]  
-> Persistent cookies will be stored in the `cookies.jar` file, from which the authorization (login) information will be restored on each subsequent run. Make sure to keep your cookies file safe, as the authorization information it stores can give another person access to your Twitch account, even without them knowing your password!
+从自己的电脑建立 SSH 隧道：
 
-> [!IMPORTANT]  
-> Successfully logging into your Twitch account in the application may cause Twitch to send you a "New Login" notification email. This is normal - you can verify that it comes from your own IP address. The detected browser during the login will be "Chrome", as that's what the miner currently presents itself to the Twitch server.
+```sh
+ssh -L 5800:127.0.0.1:5800 your-user@your-vps
+```
 
-> [!NOTE]  
-> The time remaining timer always countdowns a single minute and then stops - it is then restarted only after the application redetermines the remaining time. This "redetermination" can happen at any time Twitch decides to report on the drop's progress, but not later than 20 seconds after the timer reaches zero. The seconds timer is only an approximation and does not represent nor affect actual mining speed. The time variations are due to Twitch sometimes not reporting drop progress at all, or reporting progress for the wrong drop - these cases have all been accounted for in the application though.
+然后打开 <http://127.0.0.1:5800>，使用 `.env` 中的用户名（默认 `admin`）和刚生成的密码登录。Twitch 账号连接流程会显示在 Web UI 中。
 
-> [!NOTE]  
-> The source code requires Python 3.10 or higher to run.
+检查运行状态：
 
-### Notes about the Windows build:
+```sh
+docker compose ps
+docker compose logs --tail=100 miner
+curl --fail http://127.0.0.1:5800/healthz
+curl --fail http://127.0.0.1:5800/readyz
+```
 
-- To achieve a portable-executable format, the application is packaged with PyInstaller into an `EXE`. Some antivirus engines (including Windows Defender) might report the packaged executable as a trojan, because PyInstaller has been used by others to package malicious Python code in the past. These reports can be safely ignored. If you absolutely do not trust the executable, you'll have to install Python yourself and run everything from source.
-- The executable uses the `%TEMP%` directory for temporary runtime storage of files, that don't need to be exposed to the user (like compiled code and translation files). For persistent storage, the directory the executable resides in is used instead.
-- The autostart feature is implemented as a registry entry to the current user's (`HKCU`) autostart key. It is only altered when toggling the respective option. If you relocate the app to a different directory, the autostart feature will stop working, until you toggle the option off and back on again
+容器使用非 root 用户、只读根文件系统、受限 Linux capabilities，并将持久状态写入 `tdm-data` volume。完整的反向代理、HTTPS、备份、更新、systemd 与原生 Python 部署说明见 [Linux VPS 部署指南](docs/vps-deployment.md)。
 
-### Notes about the Linux build:
+## Web 管理与 API / Web management and API
 
-- The Linux app is built and distributed using two distinct portable-executable formats: [AppImage](https://appimage.org/) and [PyInstaller](https://pyinstaller.org/).
-- There are no major differences between the two formats, but if you're looking for a recommendation, use the AppImage.
-- The Linux app should work out of the box on any modern distribution, as long as it has `glibc>=2.35`, plus a working display server.
-- Every feature of the app is expected to work on Linux just as well as it does on Windows. If you find something that's broken, please [open a new issue](https://github.com/DevilXD/TwitchDropsMiner/issues/new).
-- The size of the Linux app is significantly larger than the Windows app due to the inclusion of the `gtk3` library (and its dependencies), which is required for proper system tray/notifications support.
-- As an alternative to the native Linux app, you can run the Windows app via [Wine](https://www.winehq.org/) instead. It works really well!
+浏览器界面使用同源 API；没有 VNC/noVNC，也不需要在服务器上运行浏览器。
 
-### Notes about the macOS build:
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/healthz` | `GET` | Web 进程存活检查 |
+| `/readyz` | `GET` | Web 服务与数据目录就绪检查 |
+| `/api/v1/session` | `GET` | 当前 Web 登录状态与 CSRF 信息 |
+| `/api/v1/auth/login` | `POST` | Web 管理员登录 |
+| `/api/v1/auth/logout` | `POST` | 注销当前 Web 会话 |
+| `/api/v1/snapshot` | `GET` | 矿工、战役、频道、掉宝与设置快照 |
+| `/api/v1/events` | `GET` | `snapshot` 事件的 SSE 实时流 |
+| `/api/v1/actions/inventory-refresh` | `POST` | 刷新 Twitch Drops 库存 |
+| `/api/v1/actions/channels/{id}/switch` | `POST` | 切换到指定频道 |
+| `/api/v1/account/token` | `DELETE` | 撤销本地保存的 Twitch 登录 |
+| `/api/v1/settings` | `PATCH` | 更新支持的 Headless 设置 |
+| `/api/v1/actions/restart` | `POST` | 请求矿工重新启动 |
 
-- The macOS version is packaged using PyInstaller into a standalone `.app` bundle, distributed as a ZIP archive.
-- Since this application is not signed with a paid Apple Developer Certificate, **macOS Gatekeeper will block it** on the first run (saying it "The application is damaged and can't be opened").
-  - **To fix this**: Either open the Terminal in the folder the app is in (or navigating with `cd path/to/folder`) and enter `xattr -cr Twitch Drops Miner (by DevilXD).app` or just type `xattr -cr ` (make sure to put a space at the end), drag and drop the `Twitch Drops Miner (by DevilXD).app` file into the terminal window (this will auto-fill the path) and enter
-- Persistent files (like `cookies.jar`, `settings.json`, `lock.file` and the `cache` folder) are stored inside the application bundle in `Twitch Drops Miner (by DevilXD).app/Contents/MacOS` (to access them Right-click the application and select `Show Package Contents`)
+除健康检查、会话查询和登录外，管理接口需要有效会话。所有变更请求还需要 `X-CSRF-Token`。API 返回的快照经过专用序列化，不包含 Twitch token、cookie 或本地文件内容。
 
-### Advanced Usage:
+## 配置与安全 / Configuration and security
 
-If you'd be interested in running the latest master from source or building your own executable, see the wiki page explaining how to do so: https://github.com/DevilXD/TwitchDropsMiner/wiki/Setting-up-the-environment,-building-and-running
+| Environment variable | Default | Description |
+| --- | --- | --- |
+| `TDM_DATA_DIR` | application directory | 持久数据目录 |
+| `TDM_WEB_HOST` | `127.0.0.1` | Web 监听地址 |
+| `TDM_WEB_PORT` | `5800` | Web 监听端口 |
+| `TDM_WEB_USERNAME` | `admin` | 管理员用户名 |
+| `TDM_WEB_PASSWORD_FILE` | unset | 管理员密码文件，推荐用于部署 |
+| `TDM_WEB_PASSWORD` | unset | 管理员密码环境变量；不要与密码文件同时使用 |
+| `TDM_WEB_COOKIE_SECURE` | `false` | 仅通过 HTTPS 发送会话 cookie |
+| `TDM_WEB_TRUST_PROXY` | `false` | 信任反向代理转发的客户端地址 |
+| `TDM_WEB_SESSION_HOURS` | `12` | 会话有效小时数 |
+| `TDM_WEB_ALLOW_UNAUTHENTICATED` | `false` | 明确允许非回环地址无认证监听，危险 |
 
-### Support
+安全要点：
 
-If you'd encounter any issues with the miner:
+- 不要将端口 `5800` 直接暴露到公网；使用 SSH 隧道或带 HTTPS 的反向代理。
+- 非回环监听在没有管理员密码时会被默认拒绝。
+- 管理密码至少 12 个字符；登录尝试有速率限制，会话保存在内存中。
+- 只有在同一台受信 VPS 上使用反向代理时才启用 `TDM_WEB_TRUST_PROXY`。
+- `cookies.jar` 和数据卷可能授予 Twitch 账号访问权限，只应加密备份并严格限制访问。
+- 不要提交 `.env`、`deploy/secrets/web_password`、`cookies.jar` 或数据目录副本。
 
-- Please see the [troubleshooting page](https://github.com/DevilXD/TwitchDropsMiner/wiki/Troubleshooting) for some common issues and their explanation.  
-- Please [search the issues page](https://github.com/DevilXD/TwitchDropsMiner/issues?q=sort%3Aupdated-desc%20is%3Aissue) to see if your issue hasn't been reported yet.  
-- If it's not been reported yet, feel free to open a new issue, describing your problem.
+## 本地开发与测试 / Development
 
-If you like the application and found it useful, please consider donating a small amount of money to support me. Thank you!
+需要 Python 3.10 或更新版本：
 
-<div align="center">
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python -m compileall -q headless main_headless.py
+node --check headless/static/app.js
+```
 
-[![Buy me a coffee](https://i.imgur.com/cL95gzE.png)](
-    https://www.buymeacoffee.com/DevilXD
-)
-[![Support me on Patreon](https://i.imgur.com/Mdkb9jq.png)](
-    https://www.patreon.com/bePatron?u=26937862
-)
+在回环地址启动开发实例：
 
-</div>
+```sh
+mkdir -p .local-data
+TDM_DATA_DIR="$PWD/.local-data" python main_headless.py
+```
 
-### Project goals:
+Headless CI 会在 Python 3.10 与 3.12 上运行测试及导入/编译检查，验证浏览器 JavaScript 语法，并构建生产 Docker 镜像。仓库仍保留部分上游桌面代码与构建文件以便同步和审计，但 VPS 生产入口是 `main_headless.py`，依赖清单是 `requirements-headless.txt`。
 
-Twitch Drops Miner (TDM for short) has been designed with a couple of simple goals in mind. These are, specifically:
+## 上游、支持与许可证 / Upstream, support and license
 
-- Twitch Drops oriented - it's in the name. That's what I made it for.
-- Easy to use for an average person. Includes a nice looking GUI and is packaged as a ready-to-go executable, without requiring an existing Python installation to work.
-- Intended as a helper tool that starts together with your PC, runs in the background through out the day, and then closes together with your PC shutting down at the end of the day. If it can run continuously for 24 hours at minimum, and not run into any errors, I'd call that good enough already.
-- Requiring a minimum amount of attention during operation - check it once or twice through out the day to see if everything's fine with it.
-- Underlying service friendly - the amount of interactions done with the Twitch site is kept to the minimum required for reliable operation, at a level achievable by a diligent site user.
+核心 Twitch Drops 逻辑来自 [DevilXD/TwitchDropsMiner](https://github.com/DevilXD/TwitchDropsMiner)，感谢 DevilXD 及所有上游贡献者。本仓库的 Web 服务、Headless 入口与 VPS 部署属于独立维护范围。
 
-TDM is not intended for/as:
+请将本版本的问题提交到本仓库，并在报告中附上经过脱敏的日志、部署方式与镜像/提交版本。不要在公开 issue 中粘贴 Twitch token、cookie、Web 密码或反向代理凭据。
 
-- Mining channel points - again, it's about the drops: only.
-- Mining anything else besides Twitch drops - no, I won't be adding support for a random 3rd party site that also happens to rely on watching Twitch streams.
-- Unattended operation: worst case scenario, it'll stop working and you'll hopefully notice that at some point. Hopefully.
-- 100% uptime application, due to the underlying nature of it, expect fatal errors to happen every so often.
-- Being hosted on a remote server as a 24/7 miner.
-- Being used with more than one managed account.
-- Mining campaigns the managed account isn't linked to.
-
-This means that features such as:
-
-- It being possible to run it without a GUI, or with only a console attached.
-- Any form of automatic restart when an error happens.
-- Docker or any other form of remote deployment.
-- Using it with more than one managed account.
-- Making it possible to mine campaigns that the managed account isn't linked to.
-- Anything that increases the site processing load caused by the application.
-- Any form of additional notifications system (email, webhook, etc.), beyond what's already implemented.
-
-..., are most likely not going to be a feature, ever. You're welcome to search through the existing issues to comment on your point of view on the relevant matters, where applicable. Otherwise, most of the new issues that go against these goals will be closed and the user will be pointed to this paragraph.
-
-For more context about these goals, please check out these issues: [#161](https://github.com/DevilXD/TwitchDropsMiner/issues/161), [#105](https://github.com/DevilXD/TwitchDropsMiner/issues/105), [#84](https://github.com/DevilXD/TwitchDropsMiner/issues/84)
-
-### Credits:
-
-<!---
-Note: The translations credits are sorted alphabetically, based on their English language name.
-When adding a new entry, please ensure to insert it in the correct place in the second section.
-Non-translations related credits should be added to the first section instead.
-
-Note: When adding a new credits line below, please add two trailing spaces at the end
-of the previous line, if they aren't already there. Doing so ensures proper markdown
-rendering on Github. In short: Each credits line should end with two trailing spaces,
-placed past the period character at the end.
-
-• Last line can have the two trailing spaces omitted.
-• Please ensure your editor won't trim the trailing spaces upon saving the file.
-• Please ensure to leave a single empty new line at the end of the file.
--->
-
-@guihkx - For the CI script, CI maintenance, and everything related to Linux builds.  
-@kWAYTV - For the implementation of the dark mode theme.  
-@crocchetto - For the macOS port.  
-
-@Bamboozul - For the entirety of the Arabic (العربية) translation.  
-@Suz1e - For the entirety of the Chinese (简体中文) translation and revisions.  
-@wwj010, @zhangminghao1989, @Self4215 - For the Chinese (简体中文) translation corrections and revisions.  
-@Ricky103403 - For the entirety of the Traditional Chinese (繁體中文) translation.  
-@LusTerCsI - For the Traditional Chinese (繁體中文) translation corrections and revisions.  
-@nwvh - For the entirety of the Czech (Čeština) translation.  
-@Kjerne - For the entirety of the Danish (Dansk) translation.  
-@lmdpocus - For the entirety of the Dutch (Nederlandse) translation.  
-@Rensoraa - For the Traditional Dutch (Nederlandse) translation corrections and revisions.  
-@roobini-gamer - For the entirety of the French (Français) translation.  
-@Calvineries - For the French (Français) translation revisions.  
-@ThisIsCyreX - For the entirety of the German (Deutsch) translation.  
-@Nagyhoho1234 - For the entirety of the Hungarian (Magyar) translation.  
-@Eriza-Z - For the entirety of the Indonesian translation.  
-@casungo - For the entirety of the Italian (Italiano) translation.  
-@ShimadaNanaki - For the entirety of the Japanese (日本語) translation.  
-@biroman -  For the entirety of the Norwegian (Norsk) translation.  
-@Patriot99 - For the Polish (Polski) translation and revisions (co-authored with @DevilXD).  
-@zarigata - For the entirety of the Portuguese (Português) translation.  
-@Sergo1217 - For the entirety of the Russian (Русский) translation.  
-@kilroy98, @flamesv - For the Russian (Русский) translation corrections and revisions.  
-@Shofuu - For the entirety of the Spanish (Español) translation and revisions.  
-@Forero-0 - For the Spanish (Español) translation revisions.  
-@alikdb - For the entirety of the Turkish (Türkçe) translation.  
-@DogancanYr, @Elderly-Emre, @Hweord - For the Turkish (Türkçe) translation corrections and revisions.  
-@Nollasko - For the entirety of the Ukrainian (Українська) translation and revisions.  
-@kilroy98 - For the Ukrainian (Українська) translation corrections and revisions.  
+本项目沿用上游的 [MIT License](LICENSE)。Twitch 是 Twitch Interactive, Inc. 的商标；本项目与 Twitch 无隶属或背书关系。使用者应自行遵守 Twitch 的服务条款及所在地法律。
